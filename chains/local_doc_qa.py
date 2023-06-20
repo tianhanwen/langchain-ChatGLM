@@ -1,5 +1,6 @@
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
+from langchain.vectorstores import Tair
 from langchain.document_loaders import UnstructuredFileLoader, TextLoader
 from configs.model_config import *
 import datetime
@@ -20,20 +21,30 @@ from agent import bing_search
 from langchain.docstore.document import Document
 from functools import lru_cache
 
+from .tair_session import get_tair_session
 
 # patch HuggingFaceEmbeddings to make it hashable
 def _embeddings_hash(self):
     return hash(self.model_name)
 
+chat_session = get_tair_session(TAIR_URL)
 
 HuggingFaceEmbeddings.__hash__ = _embeddings_hash
-
 
 # will keep CACHED_VS_NUM of vector store caches
 @lru_cache(CACHED_VS_NUM)
 def load_vector_store(vs_path, embeddings):
     return FAISS.load_local(vs_path, embeddings)
 
+# will keep CACHED_VS_NUM of vector store caches
+@lru_cache(CACHED_VS_NUM)
+def load_vector_store_tair(vs_path, embeddings):
+    vs_id = str(vs_path).split(VS_ROOT_PATH + "/")[1]
+    return Tair(embedding_function = embeddings, url = TAIR_URL, index_name = vs_id)
+
+# 
+def load_vector_store_tair_session(session_index_name, embeddings):
+    return Tair(embedding_function = embeddings, url = TAIR_URL, index_name = session_index_name)
 
 def tree(filepath, ignore_dir_names=None, ignore_file_names=None):
     """返回两个列表，第一个列表为 filepath 下全部文件的完整路径, 第二个为对应的文件名"""
@@ -99,6 +110,13 @@ def write_check_file(filepath, docs):
 def generate_prompt(related_docs: List[str],
                     query: str,
                     prompt_template: str = PROMPT_TEMPLATE, ) -> str:
+    context = "\n".join([doc.page_content for doc in related_docs])
+    prompt = prompt_template.replace("{question}", query).replace("{context}", context)
+    return prompt
+
+def generate_prompt_session(related_docs: List[str],
+                    query: str,
+                    prompt_template: str = PROMPT_TEMPLATE_SESSION, ) -> str:
     context = "\n".join([doc.page_content for doc in related_docs])
     prompt = prompt_template.replace("{question}", query).replace("{context}", context)
     return prompt
@@ -268,6 +286,63 @@ class LocalDocQA:
         else:
             logger.info("文件均未成功加载，请检查依赖包或替换为其他文件再次上传。")
             return None, loaded_files
+        
+        
+    def init_knowledge_vector_store_tair(self,
+                                    filepath: str or List[str],
+                                    vs_path: str or os.PathLike = None,
+                                    sentence_size=SENTENCE_SIZE):
+        
+        vs_id = str(vs_path).split(VS_ROOT_PATH + "/")[1]
+        loaded_files = []
+        failed_files = []
+        if isinstance(filepath, str):
+            if not os.path.exists(filepath):
+                print("路径不存在")
+                return None
+            elif os.path.isfile(filepath):
+                file = os.path.split(filepath)[-1]
+                try:
+                    docs = load_file(filepath, sentence_size)
+                    logger.info(f"{file} 已成功加载")
+                    loaded_files.append(filepath)
+                except Exception as e:
+                    logger.error(e)
+                    logger.info(f"{file} 未能成功加载")
+                    return None
+            elif os.path.isdir(filepath):
+                docs = []
+                for fullfilepath, file in tqdm(zip(*tree(filepath, ignore_dir_names=['tmp_files'])), desc="加载文件"):
+                    try:
+                        docs += load_file(fullfilepath, sentence_size)
+                        loaded_files.append(fullfilepath)
+                    except Exception as e:
+                        logger.error(e)
+                        failed_files.append(file)
+
+                if len(failed_files) > 0:
+                    logger.info("以下文件未能成功加载：")
+                    for file in failed_files:
+                        logger.info(f"{file}\n")
+
+        else:
+            docs = []
+            for file in filepath:
+                try:
+                    docs += load_file(file)
+                    logger.info(f"{file} 已成功加载")
+                    loaded_files.append(file)
+                except Exception as e:
+                    logger.error(e)
+                    logger.info(f"{file} 未能成功加载")
+                    
+        if len(docs) > 0:
+            logger.info("文件加载完毕，正在生成向量库")
+            Tair.from_documents(docs, self.embeddings, index_name=vs_id, tair_url= TAIR_URL)
+            return vs_path, loaded_files
+        else:
+            logger.info("文件均未成功加载，请检查依赖包或替换为其他文件再次上传。")
+            return None, loaded_files
 
     def one_knowledge_add(self, vs_path, one_title, one_conent, one_content_segmentation, sentence_size):
         try:
@@ -289,7 +364,8 @@ class LocalDocQA:
         except Exception as e:
             logger.error(e)
             return None, [one_title]
-
+        
+    
     def get_knowledge_based_answer(self, query, vs_path, chat_history=[], streaming: bool = STREAMING):
         vector_store = load_vector_store(vs_path, self.embeddings)
         FAISS.similarity_search_with_score_by_vector = similarity_search_with_score_by_vector
@@ -313,6 +389,51 @@ class LocalDocQA:
                         "source_documents": related_docs_with_score}
             yield response, history
 
+    def get_knowledge_based_answer_tair(self, query, vs_path, chat_history=[], streaming: bool = STREAMING):
+        vector_store = load_vector_store_tair(vs_path, self.embeddings)
+        related_docs_with_score = vector_store.similarity_search(query, k=self.top_k)
+        torch_gc()
+        if len(related_docs_with_score)>0:
+            prompt = generate_prompt(related_docs_with_score, query)
+        else:
+            prompt = query
+        for answer_result in self.llm.generatorAnswer(prompt=prompt, history=chat_history,
+                                                      streaming=streaming):
+            resp = answer_result.llm_output["answer"]
+            history = answer_result.history
+            history[-1][0] = query
+            response = {"query": query,
+                        "result": resp,
+                        "source_documents": related_docs_with_score}
+            yield response, history    
+            
+            
+    # tair_session
+    def get_prompt_by_tair_session(self, query, session_id):
+        if chat_session.not_exists_index(session_id):
+            prompt = query
+            return prompt
+        vector_store = load_vector_store_tair_session(session_id, self.embeddings)
+        related_docs_with_score = vector_store.similarity_search(query, k=self.top_k)
+        torch_gc()
+        if len(related_docs_with_score)>0:
+            prompt = generate_prompt_session(related_docs_with_score, query)
+        else:
+            prompt = query
+        return prompt
+            
+        # 写入tair_sessin数据库。
+        # text = f"问题： {query}, 机器人答案： {resp}"
+        # Tair.from_texts(text, self.embeddings, None, session_id, "content", "metadata", tair_url=TAIR_URL, distance_type="FLAT")
+        
+    def insert_tair_session(self, query, resp, session_id):
+        text = f"{query}"
+        # 写入session缓存
+        Tair.from_texts([text], self.embeddings, None, session_id, "content", "metadata", tair_url=TAIR_URL, index_type="FLAT")
+        # 设置缓存过期时间
+        chat_session.expires(session_id)
+        
+        
     # query      查询内容
     # vs_path    知识库路径
     # chunk_conent   是否启用上下文关联

@@ -27,10 +27,10 @@ def loaderLLM(llm_model: str = None, no_remote_model: bool = False, use_ptuning_
     if llm_model:
         llm_model_info = llm_model_dict[llm_model]
 
-    if loaderCheckPoint.no_remote_model:
-        loaderCheckPoint.model_name = llm_model_info['name']
-    else:
-        loaderCheckPoint.model_name = llm_model_info['pretrained_model_name']
+    #if loaderCheckPoint.no_remote_model:
+    loaderCheckPoint.model_name = llm_model_info['name']
+    #else:
+    #loaderCheckPoint.model_name = llm_model_info['pretrained_model_name']
 
     loaderCheckPoint.model_path = llm_model_info["local_model_path"]
 

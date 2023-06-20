@@ -10,13 +10,15 @@ logger.setLevel(logging.INFO)
 logging.basicConfig(format=LOG_FORMAT)
 
 embedding_model_dict = {
-    "ernie-tiny": "nghuyong/ernie-3.0-nano-zh",
-    "ernie-base": "nghuyong/ernie-3.0-base-zh",
-    "text2vec-base": "shibing624/text2vec-base-chinese",
-    "text2vec": "GanymedeNil/text2vec-large-chinese",
-    "m3e-small": "moka-ai/m3e-small",
-    "m3e-base": "moka-ai/m3e-base",
+    "text2vec": "/root/models/text2vec",
 }
+
+#it can find by os
+TAIR_URL = "redis://120.27.213.45:6380"
+if os.getenv("TAIR_URL") is not None:
+    TAIR_URL = os.getenv("TAIR_URL")
+    
+TAIR_SESSION_INDEX_PARAMS={"distance_type" : "FLAT"}
 
 # Embedding model name
 EMBEDDING_MODEL = "text2vec"
@@ -28,66 +30,11 @@ EMBEDDING_DEVICE = "cuda" if torch.cuda.is_available() else "mps" if torch.backe
 # supported LLM models
 # llm_model_dict 处理了loader的一些预设行为，如加载位置，模型名称，模型处理器实例
 llm_model_dict = {
-    "chatglm-6b-int4-qe": {
-        "name": "chatglm-6b-int4-qe",
-        "pretrained_model_name": "THUDM/chatglm-6b-int4-qe",
-        "local_model_path": None,
-        "provides": "ChatGLM"
-    },
-    "chatglm-6b-int4": {
-        "name": "chatglm-6b-int4",
-        "pretrained_model_name": "THUDM/chatglm-6b-int4",
-        "local_model_path": None,
-        "provides": "ChatGLM"
-    },
-    "chatglm-6b-int8": {
-        "name": "chatglm-6b-int8",
-        "pretrained_model_name": "THUDM/chatglm-6b-int8",
-        "local_model_path": None,
-        "provides": "ChatGLM"
-    },
     "chatglm-6b": {
         "name": "chatglm-6b",
         "pretrained_model_name": "THUDM/chatglm-6b",
-        "local_model_path": None,
+        "local_model_path": "/root/chatglm/chatglm-6b",
         "provides": "ChatGLM"
-    },
-
-    "chatyuan": {
-        "name": "chatyuan",
-        "pretrained_model_name": "ClueAI/ChatYuan-large-v2",
-        "local_model_path": None,
-        "provides": None
-    },
-    "moss": {
-        "name": "moss",
-        "pretrained_model_name": "fnlp/moss-moon-003-sft",
-        "local_model_path": None,
-        "provides": "MOSSLLM"
-    },
-    "vicuna-13b-hf": {
-        "name": "vicuna-13b-hf",
-        "pretrained_model_name": "vicuna-13b-hf",
-        "local_model_path": None,
-        "provides": "LLamaLLM"
-    },
-
-    # 通过 fastchat 调用的模型请参考如下格式
-    "fastchat-chatglm-6b": {
-        "name": "chatglm-6b",  # "name"修改为fastchat服务中的"model_name"
-        "pretrained_model_name": "chatglm-6b",
-        "local_model_path": None,
-        "provides": "FastChatOpenAILLM",  # 使用fastchat api时，需保证"provides"为"FastChatOpenAILLM"
-        "api_base_url": "http://localhost:8000/v1"  # "name"修改为fastchat服务中的"api_base_url"
-    },
-
-    # 通过 fastchat 调用的模型请参考如下格式
-    "fastchat-vicuna-13b-hf": {
-        "name": "vicuna-13b-hf",  # "name"修改为fastchat服务中的"model_name"
-        "pretrained_model_name": "vicuna-13b-hf",
-        "local_model_path": None,
-        "provides": "FastChatOpenAILLM",  # 使用fastchat api时，需保证"provides"为"FastChatOpenAILLM"
-        "api_base_url": "http://localhost:8000/v1"  # "name"修改为fastchat服务中的"api_base_url"
     },
 }
 
@@ -128,6 +75,11 @@ PROMPT_TEMPLATE = """已知信息：
 
 根据上述已知信息，简洁和专业的来回答用户的问题。如果无法从中得到答案，请说 “根据已知信息无法回答该问题” 或 “没有提供足够的相关信息”，不允许在答案中添加编造成分，答案请使用中文。 问题是：{question}"""
 
+PROMPT_TEMPLATE_SESSION = """已知用户以前提供的问题：
+{context} 
+
+根据上述已知信息，简洁回答用户问题。如果无法从中得到答案，请自行回答用户问题，答案请使用中文。 问题是：{question}"""
+
 # 缓存知识库数量
 CACHED_VS_NUM = 1
 
@@ -138,10 +90,10 @@ SENTENCE_SIZE = 100
 CHUNK_SIZE = 250
 
 # LLM input history length
-LLM_HISTORY_LEN = 3
+LLM_HISTORY_LEN = 2
 
 # return top-k text chunk from vector store
-VECTOR_SEARCH_TOP_K = 5
+VECTOR_SEARCH_TOP_K = 2
 
 # 知识检索内容相关度 Score, 数值范围约为0-1100，如果为0，则不生效，经测试设置为小于500时，匹配结果更精准
 VECTOR_SEARCH_SCORE_THRESHOLD = 0
