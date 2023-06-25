@@ -35,6 +35,3 @@ requests~=2.28.2
 tenacity~=8.2.2
 alibabacloud_bpstudio20210931==1.0.11
 alibabacloud_r_kvstore20150101==2.20.7
-psycopg2
-psycopg2cffi
-tabulate
