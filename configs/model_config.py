@@ -10,11 +10,11 @@ logger.setLevel(logging.INFO)
 logging.basicConfig(format=LOG_FORMAT)
 
 embedding_model_dict = {
-    "text2vec": "/root/models/text2vec",
+    "text2vec": "/root/models/text2vec-large-chinese",
 }
 
 #it can find by os
-TAIR_URL = "redis://120.27.213.45:6380"
+TAIR_URL = "redis://127.0.0.1:6380"
 if os.getenv("TAIR_URL") is not None:
     TAIR_URL = os.getenv("TAIR_URL")
     
