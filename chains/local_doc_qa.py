@@ -410,6 +410,9 @@ class LocalDocQA:
             
     # tair_session
     def get_prompt_by_tair_session(self, query, session_id):
+        # SESSION_BEGIN如("已知", "根据", "依据", "请根据", "请依据")，直接不查询，根据提示让大模型回答
+        if query is not None and query.startswith(SESSION_BEGIN):
+            return query        
         if chat_session.not_exists_index(session_id):
             prompt = query
             return prompt
@@ -427,11 +430,14 @@ class LocalDocQA:
         # Tair.from_texts(text, self.embeddings, None, session_id, "content", "metadata", tair_url=TAIR_URL, distance_type="FLAT")
         
     def insert_tair_session(self, query, resp, session_id):
-        text = f"{query}"
-        # 写入session缓存
-        Tair.from_texts([text], self.embeddings, None, session_id, "content", "metadata", tair_url=TAIR_URL, index_type="FLAT")
-        # 设置缓存过期时间
-        chat_session.expires(session_id)
+        # 仅有SESSION_BEGIN如("已知", "根据", "依据", "请根据", "请依据")开头的提示才把问题写入缓存
+        if query is not None and query.startswith(SESSION_BEGIN):
+            text = f"{query}"
+            # 写入session缓存
+            key = uuid.uuid4().hex
+            Tair.from_texts([text], self.embeddings, None, session_id, "content", "metadata", tair_url=TAIR_URL, index_type="FLAT", keys=[key])
+            # 设置缓存过期时间
+            chat_session.tvs_hexpire(session_id, key, SESSION_HEXPIRE_TIME)
         
         
     # query      查询内容

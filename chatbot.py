@@ -36,6 +36,12 @@ flag_csv_logger = gr.CSVLogger()
 def get_answer(query, vs_path, history, mode, score_threshold=VECTOR_SEARCH_SCORE_THRESHOLD,
                vector_search_top_k=VECTOR_SEARCH_TOP_K, chunk_conent: bool = True,
                chunk_size=CHUNK_SIZE, streaming: bool = STREAMING):
+    if query is None or len(query.strip()) == 0:
+        query = "你好"
+    
+    if len(history) > 120:
+        del history[0:100]    
+    
     if mode == "带Session的对话":
         # get session_id: TODO: get by client
         session_id = "session"
@@ -233,12 +239,10 @@ webui_title = """
 default_vs = get_vs_list()[0] if len(get_vs_list()) > 1 else "为空"
 init_message = f"""欢迎使用 Langchain Tair ChatGLM Web UI！
 
-请在右侧切换模式，目前支持直接与 LLM 模型对话、基于本地知识库问答、带Session会话
-
-知识库问答模式，选择知识库名称后，即可开始问答，如有需要可以在选择知识库名称后上传文件/文件夹至知识库, 向量数据会存储在Tair中，知识库暂不支持文件删除。
-
-带Session会话，底层使用了Tair存储用户历史问题, 目前不区分用户且5分钟没有访问后会自动删除, 如果有定制化需求，可以为每个用户分配个索引, 该功能处于探索创新阶段，不能很好保证效果。
-
+请在右侧切换模式，目前支持直接与 LLM 模型对话、基于本地知识库问答、带Session会话\n
+知识库问答模式，选择知识库名称后，即可开始问答，如有需要可以在选择知识库名称后上传文件/文件夹至知识库, 向量数据会存储在Tair中，知识库暂不支持文件删除。\n
+带Session会话，底层使用了Tair存储用户历史问题, 给大模型提示需要以 ("已知", "根据", "依据", "请根据", "请依据") 开头, 且每个提示信息缓存1小时后失效。
+目前不区分用户，如果有定制化需求，可以为每个用户分配个索引, 该功能处于探索创新阶段，不能很好保证效果\n
 请自觉遵守在镜像上安装的第三方模型的用户协议、使用规范和相关法律法规，并就使用第三方模型的合法性、合规性自行承担相关责任。
 
 """

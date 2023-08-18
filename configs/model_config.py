@@ -38,6 +38,9 @@ llm_model_dict = {
     },
 }
 
+SESSION_BEGIN = ("已知", "根据", "依据", "请根据", "请依据")
+
+SESSION_HEXPIRE_TIME = 3600
 # LLM 名称
 LLM_MODEL = "chatglm-6b"
 # 如果你需要加载本地的model，指定这个参数  ` --no-remote-model`，或者下方参数修改为 `True`
