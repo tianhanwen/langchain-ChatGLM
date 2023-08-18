@@ -1,0 +1,2 @@
+export TAIR_URL=redis://default:替换为你的Tair实例账号@r-xxx.redis.rds.aliyuncs.com:6379
+export DASHSCOPE_API_KEY=替换为你的APIKEY

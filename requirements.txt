@@ -1,0 +1,10 @@
+langchain==0.0.174
+nltk~=3.8.1
+gradio==3.28.3
+fastapi~=0.95.0
+numpy~=1.23.5
+requests~=2.28.2
+sentence-transformers
+redis=4.5.4
+tair
+dashscope

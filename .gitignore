@@ -1,0 +1,4 @@
+flagged/
+content/
+vector_store/
+*__pycache__*
