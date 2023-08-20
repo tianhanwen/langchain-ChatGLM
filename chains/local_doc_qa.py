@@ -200,10 +200,10 @@ class LocalDocQA:
             logger.info("文件均未成功加载，请检查依赖包或替换为其他文件再次上传。")
             return None, loaded_files
 
-    def get_knowledge_based_answer_tair(self, query, vs_path, chat_history=[], use_hybrid_search: bool = False, streaming: bool = STREAMING):
+    def get_knowledge_based_answer_tair(self, query, vs_path, chat_history=[], use_hybrid_search: bool = False, hybrid_search_type_flag: float = 0.5,streaming: bool = STREAMING):
         vector_store = load_vector_store_tair(vs_path, self.embeddings)
-        # 
-        kwargs = {"TEXT" : query, "hybrid_ratio" : 0.5}
+        # 混合检索参数
+        kwargs = {"TEXT" : query, "hybrid_ratio" : hybrid_search_type_flag}
         related_docs_with_score = []
         if use_hybrid_search:
             related_docs_with_score = vector_store.similarity_search(query, k=self.top_k, **kwargs)
