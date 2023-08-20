@@ -9,6 +9,8 @@ import nltk
 
 nltk.data.path = [NLTK_DATA_PATH] + nltk.data.path
 
+use_hybrid_search_list = ["否", "是"]
+
 def get_vs_list():
     lst_default = ["新建知识库"]
     if not os.path.exists(VS_ROOT_PATH):
@@ -18,6 +20,34 @@ def get_vs_list():
         return lst_default
     lst.sort()
     return lst_default + lst
+
+def get_hybrid_chose(vs_name):
+    if not os.path.exists(VS_ROOT_PATH):
+        return use_hybrid_search_list
+    lst = os.listdir(VS_ROOT_PATH + "/" + vs_name)
+    if not lst:
+        return use_hybrid_search_list
+    f = open(os.path.join(VS_ROOT_PATH, vs_name, "flag"), "r")
+    flag = f.readline()
+    f.close()
+    if str(flag).strip() == "0":
+        return ["否"]
+    else:
+        return ["是"]
+    
+def get_default_hybrid_chose(vs_name):
+    if not os.path.exists(VS_ROOT_PATH):
+        return USE_HYBRID_SEARCH
+    lst = os.listdir(VS_ROOT_PATH + "/" + vs_name)
+    if not lst:
+        return USE_HYBRID_SEARCH
+    f = open(os.path.join(VS_ROOT_PATH, vs_name, "flag"), "r")
+    flag = f.readline()
+    f.close()
+    if str(flag).strip() == "0":
+        return "否"
+    else:
+        return "是"
 
 # 将文本编码为向量
 embedding_model_dict_list = list(embedding_model_dict.keys())
@@ -30,7 +60,7 @@ local_doc_qa = LocalDocQA()
 flag_csv_logger = gr.CSVLogger()
 
 
-def get_answer(query: str, vs_path, history, mode, score_threshold=VECTOR_SEARCH_SCORE_THRESHOLD,
+def get_answer(query: str, vs_path, history, mode, use_hybrid_search, score_threshold=VECTOR_SEARCH_SCORE_THRESHOLD,
                vector_search_top_k=VECTOR_SEARCH_TOP_K, chunk_conent: bool = True,
                chunk_size=CHUNK_SIZE, streaming: bool = STREAMING):
     
@@ -55,8 +85,11 @@ def get_answer(query: str, vs_path, history, mode, score_threshold=VECTOR_SEARCH
             yield history, ""
         local_doc_qa.insert_tair_session(query=query, resp=resp, session_id=session_id)    
     elif mode == "知识库问答" and vs_path is not None and os.path.exists(vs_path):
+        use_hybrid = False
+        if use_hybrid_search == "是":
+            use_hybrid = True
         for resp, history in local_doc_qa.get_knowledge_based_answer_tair(
-                query=query, vs_path=vs_path, chat_history=history, streaming=streaming):
+                query=query, vs_path=vs_path, chat_history=history, use_hybrid_search = use_hybrid, streaming=streaming):
             source = "\n\n"
             source += "".join(
                 [f"""<details> <summary>出处 [{i + 1}] {os.path.split(doc.metadata["source"])[-1]}</summary>\n"""
@@ -140,13 +173,14 @@ def get_vector_store(vs_id, files, sentence_size, history, one_conent, one_conte
 
 def change_vs_name_input(vs_id, history):
     if vs_id == "新建知识库" or vs_id is None:
-        return gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), None, history
+        return gr.update(visible=True), gr.update(choices = use_hybrid_search_list), gr.update(visible=True), gr.update(visible=False), None, history
     else:
         vs_path = os.path.join(VS_ROOT_PATH, vs_id)
         file_status = f"已加载知识库{vs_id}，请开始提问"
-        return gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), \
+        return gr.update(visible=False), gr.update(
+                choices=get_hybrid_chose(vs_id), value=get_default_hybrid_chose(vs_id)
+            ),gr.update(visible=False), gr.update(visible=True), \
                vs_path, history + [[None, file_status]]
-
 
 def change_mode(mode, history):
     if mode == "知识库问答":
@@ -169,7 +203,7 @@ def change_chunk_conent(mode, label_conent, history):
         return gr.update(visible=False), history + [[None, f"【已关闭{conent}】"]]
 
 
-def add_vs_name(vs_name, chatbot):
+def add_vs_name(vs_name, use_hybrid_search, chatbot):
     if vs_name in get_vs_list():
         vs_status = "与已有知识库名称冲突，请重新选择其他名称后提交"
         chatbot = chatbot + [[None, vs_status]]
@@ -182,11 +216,18 @@ def add_vs_name(vs_name, chatbot):
         # 新建向量库存储路径
         if not os.path.exists(os.path.join(VS_ROOT_PATH, vs_name)):
             os.makedirs(os.path.join(VS_ROOT_PATH, vs_name))
+            f = open(os.path.join(VS_ROOT_PATH, vs_name, "flag"), "w")
+            if str(use_hybrid_search).strip() == "是":
+                f.write("1")
+            else:
+                f.write("0")
+            f.close()
         vs_status = f"""已新增知识库"{vs_name}",将在上传文件并载入成功后进行存储。请在开始对话前，先完成文件上传。 """
         chatbot = chatbot + [[None, vs_status]]
-        return gr.update(visible=True, choices=get_vs_list(), value=vs_name), gr.update(
-            visible=False), gr.update(visible=False), gr.update(visible=True), chatbot
-
+        return gr.update(visible=True, choices=get_vs_list(), value=vs_name
+                         ), gr.update(visible=False), gr.update(
+                                choices=get_hybrid_chose(vs_name), value = get_default_hybrid_chose(vs_name)
+                             ), gr.update(visible=False), gr.update(visible=True), chatbot
 
 # 自动化加载固定文件间中文件
 def reinit_vector_store(vs_id, history):
@@ -271,6 +312,10 @@ with gr.Blocks(css=block_css, theme=gr.themes.Default(**default_theme_args)) as 
                                          lines=1,
                                          interactive=True,
                                          visible=True)
+                    use_hybrid_search = gr.Radio(use_hybrid_search_list,
+                                                label="是否开启混合检索",
+                                                value=USE_HYBRID_SEARCH,
+                                                interactive=True)
                     vs_add = gr.Button(value="添加至知识库选项", visible=True)
                     file2vs = gr.Column(visible=False)
                     with file2vs:
@@ -294,11 +339,11 @@ with gr.Blocks(css=block_css, theme=gr.themes.Default(**default_theme_args)) as 
                                      inputs=[],
                                      outputs=select_vs)
                     vs_add.click(fn=add_vs_name,
-                                 inputs=[vs_name, chatbot],
-                                 outputs=[select_vs, vs_name, vs_add, file2vs, chatbot])
+                                 inputs=[vs_name, use_hybrid_search, chatbot],
+                                 outputs=[select_vs, vs_name, use_hybrid_search, vs_add, file2vs, chatbot])
                     select_vs.change(fn=change_vs_name_input,
                                      inputs=[select_vs, chatbot],
-                                     outputs=[vs_name, vs_add, file2vs, vs_path, chatbot])
+                                     outputs=[vs_name, use_hybrid_search, vs_add, file2vs, vs_path, chatbot])
                     load_file_button.click(get_vector_store,
                                            show_progress=True,
                                            inputs=[select_vs, files, sentence_size, chatbot, vs_add, vs_add],
@@ -310,7 +355,7 @@ with gr.Blocks(css=block_css, theme=gr.themes.Default(**default_theme_args)) as 
                                              outputs=[vs_path, folder_files, chatbot], )
                     flag_csv_logger.setup([query, vs_path, chatbot, mode], "flagged")
                     query.submit(get_answer,
-                                 [query, vs_path, chatbot, mode],
+                                 [query, vs_path, chatbot, mode, use_hybrid_search],
                                  [chatbot, query])
 
     with gr.Tab("模型配置"):

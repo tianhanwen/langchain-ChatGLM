@@ -22,7 +22,6 @@ def _embeddings_hash(self):
 
 HuggingFaceEmbeddings.__hash__ = _embeddings_hash
 
-
 def load_vector_store_tair_session(session_index_name, embeddings):
     return Tair(embedding_function = embeddings, url = TAIR_URL, index_name = session_index_name)
 
@@ -185,17 +184,31 @@ class LocalDocQA:
                     logger.error(e)
                     logger.info(f"{file} 未能成功加载")
                     
+        # 是否使用混合索引
+        f = open(os.path.join(VS_ROOT_PATH, vs_id, "flag"), "r")
+        flag = f.readline()
+        f.close()        
         if len(docs) > 0:
             logger.info("文件加载完毕，正在生成向量库")
-            Tair.from_documents(docs, self.embeddings, index_name=vs_id, tair_url= TAIR_URL)
+            # 不使用:
+            if str(flag).strip() == "0":
+                Tair.from_documents(docs, self.embeddings, index_name=vs_id, tair_url=TAIR_URL)
+            else:
+                Tair.from_documents(docs, self.embeddings, index_name=vs_id, tair_url=TAIR_URL, index_params={"lexical_algorithm":"bm25", "hybrid_ratio":0.5})
             return vs_path, loaded_files
         else:
             logger.info("文件均未成功加载，请检查依赖包或替换为其他文件再次上传。")
             return None, loaded_files
 
-    def get_knowledge_based_answer_tair(self, query, vs_path, chat_history=[], streaming: bool = STREAMING):
+    def get_knowledge_based_answer_tair(self, query, vs_path, chat_history=[], use_hybrid_search: bool = False, streaming: bool = STREAMING):
         vector_store = load_vector_store_tair(vs_path, self.embeddings)
-        related_docs_with_score = vector_store.similarity_search(query, k=self.top_k)
+        # 
+        kwargs = {"TEXT" : query, "hybrid_ratio" : 0.5}
+        related_docs_with_score = []
+        if use_hybrid_search:
+            related_docs_with_score = vector_store.similarity_search(query, k=self.top_k, **kwargs)
+        else:
+            related_docs_with_score = vector_store.similarity_search(query, k=self.top_k)
         if len(related_docs_with_score)>0:
             prompt = generate_prompt(related_docs_with_score, query)
         else:

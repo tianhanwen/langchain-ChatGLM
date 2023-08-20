@@ -9,7 +9,7 @@ logging.basicConfig(format=LOG_FORMAT)
 
 # 替换为本地目录
 embedding_model_dict = {
-    "text2vec": "/embedding/text2vec-large-chinese",
+    "text2vec": "/Users/thw/data/vector/tyqw/embedding/text2vec-large-chinese",
 }
 
 #it can find by os
@@ -25,6 +25,8 @@ TAIR_SESSION_INDEX_PARAMS={"distance_type" : "FLAT"}
 
 # Embedding model name
 EMBEDDING_MODEL = "text2vec"
+
+USE_HYBRID_SEARCH = "否"
 
 # supported LLM models
 # llm_model_dict 处理了loader的一些预设行为，如加载位置，模型名称，模型处理器实例
