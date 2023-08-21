@@ -9,10 +9,6 @@ import nltk
 
 nltk.data.path = [NLTK_DATA_PATH] + nltk.data.path
 
-use_hybrid_search_list = ["否", "是"]
-hybrid_search_type_list = ["向量文本混合","纯向量","纯文本"]
-default_hybrid_search_type = "向量文本混合"
-
 def get_vs_list():
     lst_default = ["新建知识库"]
     if not os.path.exists(VS_ROOT_PATH):
@@ -25,10 +21,10 @@ def get_vs_list():
 
 def get_hybrid_chose(vs_name):
     if not os.path.exists(VS_ROOT_PATH):
-        return use_hybrid_search_list
+        return USE_HYBRID_SEARCH_LIST
     lst = os.listdir(VS_ROOT_PATH + "/" + vs_name)
     if not lst:
-        return use_hybrid_search_list
+        return USE_HYBRID_SEARCH_LIST
     f = open(os.path.join(VS_ROOT_PATH, vs_name, "flag"), "r")
     flag = f.readline()
     f.close()
@@ -74,7 +70,6 @@ llm_model_dict_list = list(llm_model_key_dict.keys())
 local_doc_qa = LocalDocQA()
 
 flag_csv_logger = gr.CSVLogger()
-
 
 def get_answer(query: str, vs_path, history, mode, use_hybrid_search, hybrid_search_type, score_threshold=VECTOR_SEARCH_SCORE_THRESHOLD,
                vector_search_top_k=VECTOR_SEARCH_TOP_K, chunk_conent: bool = True,
@@ -145,11 +140,7 @@ def init_model():
     except Exception as e:
         logger.error(e)
         reply = """模型未成功加载，请到页面左上角"模型配置"选项卡中重新选择后点击"加载模型"按钮"""
-        if str(e) == "Unknown platform: darwin":
-            logger.info("该报错可能因为您使用的是 macOS 操作系统，需先下载模型至本地后执行 Web UI，具体方法请参考项目 README 中本地部署方法及常见问题："
-                        " https://github.com/imClumsyPanda/langchain-ChatGLM")
-        else:
-            logger.info(reply)
+        logger.info(reply)
         return reply
 
 def reinit_model(llm_model, embedding_model, llm_history_len, top_k,
@@ -171,17 +162,14 @@ def reinit_model(llm_model, embedding_model, llm_history_len, top_k,
 def get_vector_store(vs_id, files, sentence_size, history, one_conent, one_content_segmentation):
     vs_path = os.path.join(VS_ROOT_PATH, vs_id)
     filelist = []
+    loaded_files = []
     if local_doc_qa.llm and local_doc_qa.embeddings:
         if isinstance(files, list):
             for file in files:
                 filename = os.path.split(file.name)[-1]
                 shutil.move(file.name, os.path.join(UPLOAD_ROOT_PATH, vs_id, filename))
                 filelist.append(os.path.join(UPLOAD_ROOT_PATH, vs_id, filename))
-            #vs_path, loaded_files = local_doc_qa.init_knowledge_vector_store(filelist, vs_path, sentence_size)
-            vs_path, loaded_files = local_doc_qa.init_knowledge_vector_store_tair(filelist, vs_path, sentence_size)
-        else:
-            vs_path, loaded_files = local_doc_qa.one_knowledge_add(vs_path, files, one_conent, one_content_segmentation,
-                                                                   sentence_size)
+            vs_path, loaded_files = local_doc_qa.init_knowledge_vector_store_tair(filelist, vs_path, sentence_size)                                                            
         if len(loaded_files):
             file_status = f"已添加 {'、'.join([os.path.split(i)[-1] for i in loaded_files if i])} 内容至知识库，并已加载知识库，请开始提问"
         else:
@@ -195,15 +183,15 @@ def get_vector_store(vs_id, files, sentence_size, history, one_conent, one_conte
 
 def change_vs_name_input(vs_id, history):
     if vs_id == "新建知识库" or vs_id is None:
-        return gr.update(visible=True), gr.update(choices = use_hybrid_search_list), gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None, history
+        return gr.update(visible=True, value = ''), gr.update(choices = USE_HYBRID_SEARCH_LIST, value=USE_HYBRID_SEARCH), gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None, history
     else:
         vs_path = os.path.join(VS_ROOT_PATH, vs_id)
         file_status = f"已加载知识库{vs_id}，请开始提问"
         return gr.update(visible=False), \
-            gr.update(choices=get_hybrid_chose(vs_id), value=get_default_hybrid_chose(vs_id)),\
-            gr.update(visible=judge_show_hybrid_type(vs_id), value=default_hybrid_search_type), \
-            gr.update(visible=False),\
-                gr.update(visible=True), vs_path, history + [[None, file_status]]
+                gr.update(choices=get_hybrid_chose(vs_id), value=get_default_hybrid_chose(vs_id)),\
+                    gr.update(visible=judge_show_hybrid_type(vs_id), value=DEFAULT_HYBRID_SEARCH_TYPE), \
+                        gr.update(visible=False),\
+                            gr.update(visible=True), vs_path, history + [[None, file_status]]
 
 def change_mode(mode, history):
     if mode == "知识库问答":
@@ -230,8 +218,13 @@ def add_vs_name(vs_name, use_hybrid_search, chatbot):
     if vs_name in get_vs_list():
         vs_status = "与已有知识库名称冲突，请重新选择其他名称后提交"
         chatbot = chatbot + [[None, vs_status]]
-        return gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(
-            visible=False), chatbot
+        return  gr.update(visible=True), \
+                gr.update(visible=True, value=''),\
+                gr.update(visible=True), \
+                gr.update(visible=False), \
+                gr.update(visible=True), \
+                gr.update(visible=False), \
+                chatbot
     else:
         # 新建上传文件存储路径
         if not os.path.exists(os.path.join(UPLOAD_ROOT_PATH, vs_name)):
@@ -247,10 +240,13 @@ def add_vs_name(vs_name, use_hybrid_search, chatbot):
             f.close()
         vs_status = f"""已新增知识库"{vs_name}",将在上传文件并载入成功后进行存储。请在开始对话前，先完成文件上传。 """
         chatbot = chatbot + [[None, vs_status]]
-        return gr.update(visible=True, choices=get_vs_list(), value=vs_name
-                         ), gr.update(visible=False), gr.update(
-                                choices=get_hybrid_chose(vs_name), value = get_default_hybrid_chose(vs_name)
-                             ), gr.update(visible=False), gr.update(visible=True), chatbot
+        return  gr.update(visible=True, choices=get_vs_list(),value=vs_name), \
+                gr.update(visible=False), \
+                gr.update(choices=get_hybrid_chose(vs_name), value = get_default_hybrid_chose(vs_name)),\
+                gr.update(visible=judge_show_hybrid_type(vs_name)), \
+                gr.update(visible=False), \
+                gr.update(visible=True), \
+                chatbot
 
 # 自动化加载固定文件间中文件
 def reinit_vector_store(vs_id, history):
@@ -335,13 +331,13 @@ with gr.Blocks(css=block_css, theme=gr.themes.Default(**default_theme_args)) as 
                                          lines=1,
                                          interactive=True,
                                          visible=True)
-                    use_hybrid_search = gr.Radio(use_hybrid_search_list,
+                    use_hybrid_search = gr.Radio(USE_HYBRID_SEARCH_LIST,
                                                 label="是否开启混合检索",
                                                 value=USE_HYBRID_SEARCH,
                                                 interactive=True)
-                    hybrid_search_type = gr.Radio(hybrid_search_type_list,
+                    hybrid_search_type = gr.Radio(HYBRID_SEARCH_TYPE_LIST,
                                                   label="混合检索模式",
-                                                  value=default_hybrid_search_type,
+                                                  value=DEFAULT_HYBRID_SEARCH_TYPE,
                                                   visible=False,
                                                   interactive=True)
                     vs_add = gr.Button(value="添加至知识库选项", visible=True)
@@ -368,7 +364,7 @@ with gr.Blocks(css=block_css, theme=gr.themes.Default(**default_theme_args)) as 
                                      outputs=select_vs)
                     vs_add.click(fn=add_vs_name,
                                  inputs=[vs_name, use_hybrid_search, chatbot],
-                                 outputs=[select_vs, vs_name, use_hybrid_search, vs_add, file2vs, chatbot])
+                                 outputs=[select_vs, vs_name, use_hybrid_search, hybrid_search_type, vs_add, file2vs, chatbot])
                     select_vs.change(fn=change_vs_name_input,
                                      inputs=[select_vs, chatbot],
                                      outputs=[vs_name, use_hybrid_search, hybrid_search_type, vs_add, file2vs, vs_path, chatbot])

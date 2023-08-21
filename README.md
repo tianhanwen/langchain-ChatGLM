@@ -1,6 +1,4 @@
-本服务支持通过阿里云计算巢一键拉起：
-https://computenest.console.aliyun.com/user/cn-hangzhou/serviceInstanceCreate?ServiceId=service-bad9920e33014ecf8a86
-最好根据计算巢一键拉起，因为混合检索功能模块，langchain的代码有修改，正在走合入流程，当然，如果您不开启混合检索，可以忽略该提示。
+本服务可以在阿里云计算巢上一键拉起，如果要部署，请参考以下文档
 
 1. 前期准备
    
@@ -17,7 +15,8 @@ https://computenest.console.aliyun.com/user/cn-hangzhou/serviceInstanceCreate?Se
    
   ```
    pip3 install -r requirements.txt
-   configs/model_config.py embedding_model_dict 替换为本地目录 
+   # 正在向langchain里提交代码支持混合检索, 暂时需要把安装的的site-packages/langchain/vectorstores/tair.py，替换为本项目depends/tair.py
+   configs/model_config.py embedding_model_dict 
    先需要执行 git lfs clone https://huggingface.co/GanymedeNil/text2vec-large-chinese
    embedding_model_dict = {
     "text2vec": "/embedding/text2vec-large-chinese",

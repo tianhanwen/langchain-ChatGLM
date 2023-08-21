@@ -26,6 +26,12 @@ TAIR_SESSION_INDEX_PARAMS={"distance_type" : "FLAT"}
 # Embedding model name
 EMBEDDING_MODEL = "text2vec"
 
+USE_HYBRID_SEARCH_LIST = ["否", "是"]
+
+HYBRID_SEARCH_TYPE_LIST = ["向量文本混合","纯向量","纯文本"]
+
+DEFAULT_HYBRID_SEARCH_TYPE = "向量文本混合" 
+
 USE_HYBRID_SEARCH = "否"
 
 # supported LLM models
