@@ -190,11 +190,12 @@ class LocalDocQA:
         f.close()        
         if len(docs) > 0:
             logger.info("文件加载完毕，正在生成向量库")
-            # 不使用:
+            # 不使用混合检索
             if str(flag).strip() == "0":
                 Tair.from_documents(docs, self.embeddings, index_name=vs_id, tair_url=TAIR_URL)
             else:
-                Tair.from_documents(docs, self.embeddings, index_name=vs_id, tair_url=TAIR_URL, index_params={"lexical_algorithm":"bm25", "hybrid_ratio":0.5})
+                Tair.from_documents(docs, self.embeddings, index_name=vs_id, tair_url=TAIR_URL, 
+                                    index_params={"lexical_algorithm":"bm25", "hybrid_ratio":0.5})
             return vs_path, loaded_files
         else:
             logger.info("文件均未成功加载，请检查依赖包或替换为其他文件再次上传。")
@@ -205,6 +206,7 @@ class LocalDocQA:
         # 混合检索参数
         kwargs = {"TEXT" : query, "hybrid_ratio" : hybrid_search_type_flag}
         related_docs_with_score = []
+        # 使用混合检索
         if use_hybrid_search:
             related_docs_with_score = vector_store.similarity_search(query, k=self.top_k, **kwargs)
         else:
@@ -213,6 +215,7 @@ class LocalDocQA:
             prompt = generate_prompt(related_docs_with_score, query)
         else:
             prompt = query
+        # 同问题一起进行Prompt提交大模型
         for answer_result in self.llm.generatorAnswer(prompt=prompt, history=chat_history,
                                                       streaming=streaming):
             resp = answer_result.llm_output["answer"]

@@ -1,7 +1,6 @@
 本服务支持通过阿里云计算巢一键拉起：
 https://computenest.console.aliyun.com/user/cn-hangzhou/serviceInstanceCreate?ServiceId=service-bad9920e33014ecf8a86
-
-如果想自己部署，需要做以下准备：
+最好根据计算巢一键拉起，因为混合检索功能模块，langchain的代码有修改，正在走合入流程，当然，如果您不开启混合检索，可以忽略该提示。
 
 1. 前期准备
    
