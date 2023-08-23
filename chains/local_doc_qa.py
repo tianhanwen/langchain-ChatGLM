@@ -190,11 +190,11 @@ class LocalDocQA:
         f.close()        
         if len(docs) > 0:
             logger.info("文件加载完毕，正在生成向量库")
-            # 是否使用混合检索
             '''
+            是否构建混合检索索引
             参考文档：https://help.aliyun.com/zh/tair/developer-reference/vector
-            Tair.from_documents:本质上会检查索引是否存在，不存在则调用 TVS.CREATEINDEX 创建索引，
-                                再调用 TVS.HSET 写入数据
+            Tair.from_documents: 本质上会检查索引是否存在，不存在则调用 TVS.CREATEINDEX 创建索引，
+                                 再调用 TVS.HSET 写入数据
             '''
             if str(flag).strip() == "0":
                 Tair.from_documents(docs, self.embeddings, index_name=vs_id, tair_url=TAIR_URL)
@@ -206,9 +206,10 @@ class LocalDocQA:
             logger.info("文件均未成功加载，请检查依赖包或替换为其他文件再次上传。")
             return None, loaded_files
 
-    def get_knowledge_based_answer_tair(self, query, vs_path, chat_history=[], use_hybrid_search: bool = False, hybrid_search_type_flag: float = 0.5,streaming: bool = STREAMING):
+    def get_knowledge_based_answer_tair(self, query, vs_path, chat_history=[], use_hybrid_search: bool = False, 
+                                        hybrid_search_type_flag: float = 0.5,streaming: bool = STREAMING):
         vector_store = load_vector_store_tair(vs_path, self.embeddings)
-        # 混合检索参数
+        # 混合检索参数，hybrid_ratio: 0.5 混合检索, hybrid_ratio: 0.9999 纯向量, hybrid_ratio: 0.0001 纯文本
         kwargs = {"TEXT" : query, "hybrid_ratio" : hybrid_search_type_flag}
         related_docs_with_score = []
         '''
@@ -257,6 +258,7 @@ class LocalDocQA:
             text = f"{query}"
             # 写入session缓存
             key = uuid.uuid4().hex
-            Tair.from_texts([text], self.embeddings, None, session_id, "content", "metadata", tair_url=TAIR_URL, index_type="FLAT", keys=[key])
+            Tair.from_texts([text], self.embeddings, None, session_id, "content", "metadata", 
+                            tair_url=TAIR_URL, index_type="FLAT", keys=[key])
             # 设置缓存过期时间
             chat_session.tvs_hexpire(session_id, key, SESSION_HEXPIRE_TIME)

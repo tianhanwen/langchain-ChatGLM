@@ -20,10 +20,8 @@ class AliyunQwen(BaseAnswer, ABC):
     def set_history_len(self, history_len: int = 10) -> None:
         self.history_len = history_len
     
-    def generatorAnswer(self, prompt: str,
-                        history: List[List[str]] = [],
-                        streaming: bool = False, use_history: bool = True):
-        # 构造属于Qwen的history
+    def generatorAnswer(self, prompt: str,history: List[List[str]] = [], streaming: bool = False, use_history: bool = True):
+        # 构造属于Qwen的history，传递的history为 [[问题1，答案1],[问题2,答案2]]
         def parser_history(history: List[List[str]] = []):
             result_history = [] 
             if use_history == False:
@@ -40,6 +38,7 @@ class AliyunQwen(BaseAnswer, ABC):
             history += [[]]
             tmp_history = history[-self.history_len:-1] if self.history_len > 1 else []
             qwen_history = parser_history(tmp_history)
+            # streaming调用方式
             responses=Generation.call(model=self.model_name, prompt=prompt, stream=True, history=qwen_history, max_length=self.max_token)
             for response in responses:
                 answer_result = AnswerResult()
@@ -56,6 +55,7 @@ class AliyunQwen(BaseAnswer, ABC):
             tmp_history=history[-self.history_len:] if self.history_len > 0 else [],
             qwen_history = parser_history(tmp_history)
             answer_result = AnswerResult()
+            # 非straming的调用方式
             response=Generation.call(model=self.model_name, prompt=prompt, stream=False, history=qwen_history, max_length=self.max_token)
             if response.status_code==HTTPStatus.OK:
                 res = response.output.text
